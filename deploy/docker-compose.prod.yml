@@ -1,0 +1,30 @@
+name: glitch-prod
+
+networks:
+  traefik-public:
+    external: true
+
+services:
+  api:
+    image: ghcr.io/samyleedev/glitch-api:${IMAGE_TAG}
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.glitch-api-prod.rule=Host(`api.glitch.samyleedev.fr`)"
+      - "traefik.http.routers.glitch-api-prod.entrypoints=websecure"
+      - "traefik.http.routers.glitch-api-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.glitch-api-prod.loadbalancer.server.port=3000"
+
+  web:
+    image: ghcr.io/samyleedev/glitch-web:${IMAGE_TAG}
+    restart: unless-stopped
+    networks:
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.glitch-web-prod.rule=Host(`glitch.samyleedev.fr`)"
+      - "traefik.http.routers.glitch-web-prod.entrypoints=websecure"
+      - "traefik.http.routers.glitch-web-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.glitch-web-prod.loadbalancer.server.port=3000"
