@@ -1,0 +1,120 @@
+name: Deploy glitch
+
+on:
+  push:
+    branches: [preprod]
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Build api image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: false
+      - name: Build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          push: false
+
+  build-and-deploy-preprod:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/preprod'
+    runs-on: ubuntu-latest
+    environment: preprod
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push api image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          push: true
+          tags: ghcr.io/samyleedev/glitch-api:${{ github.sha }}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          push: true
+          tags: ghcr.io/samyleedev/glitch-web:${{ github.sha }}
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy/docker-compose.preprod.yml"
+          target: "/opt/glitch/preprod"
+          strip_components: 1
+
+      - name: Deploy to preprod
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/glitch/preprod
+            mv docker-compose.preprod.yml docker-compose.yml
+            cat > .env << 'ENVEOF'
+            IMAGE_TAG=${{ github.sha }}
+            CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+            ENVEOF
+            docker compose pull
+            docker compose up -d
+
+  deploy-prod:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == 'prod'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy compose file to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy/docker-compose.prod.yml"
+          target: "/opt/glitch/prod"
+          strip_components: 1
+
+      - name: Deploy to production (no rebuild, promoting existing image)
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/glitch/prod
+            mv docker-compose.prod.yml docker-compose.yml
+            cat > .env << 'ENVEOF'
+            IMAGE_TAG=${{ github.event.pull_request.head.sha }}
+            CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+            ENVEOF
+            docker compose pull
+            docker compose up -d
