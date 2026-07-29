@@ -18,6 +18,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY --from=build /app/dist ./dist
 
 RUN addgroup -S nodejs && adduser -S nestjs -G nodejs
+RUN chown -R nestjs:nodejs /app
 USER nestjs
 
 EXPOSE 3000
