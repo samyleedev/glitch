@@ -73,6 +73,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eo pipefail
             cd /opt/glitch/preprod
             mv docker-compose.preprod.yml docker-compose.yml
             cat > .env << 'ENVEOF'
@@ -114,6 +115,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eo pipefail
             cd /opt/glitch/prod
             mv docker-compose.prod.yml docker-compose.yml
             cat > .env << 'ENVEOF'
