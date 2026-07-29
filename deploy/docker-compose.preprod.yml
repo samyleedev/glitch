@@ -3,13 +3,42 @@ name: glitch-preprod
 networks:
   traefik-public:
     external: true
+  internal:
+
+volumes:
+  postgres_data:
 
 services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    networks:
+      - internal
+    environment:
+      POSTGRES_DB: glitch
+      POSTGRES_USER: glitch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     image: ghcr.io/samyleedev/glitch-api:${IMAGE_TAG}
     restart: unless-stopped
     networks:
       - traefik-public
+      - internal
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.glitch-api-preprod.rule=Host(`preprod-api.glitch.samyleedev.fr`)"
