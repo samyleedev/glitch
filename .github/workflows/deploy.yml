@@ -73,13 +73,18 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eo pipefail
             cd /opt/glitch/preprod
             mv docker-compose.preprod.yml docker-compose.yml
             cat > .env << 'ENVEOF'
             IMAGE_TAG=${{ github.sha }}
             CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DATABASE_URL=postgresql://glitch:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/glitch?schema=public
             ENVEOF
             docker compose pull
+            docker compose up -d --wait postgres
+            docker compose run --rm api npx prisma migrate deploy
             docker compose up -d
 
   deploy-prod:
@@ -110,11 +115,16 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
+            set -eo pipefail
             cd /opt/glitch/prod
             mv docker-compose.prod.yml docker-compose.yml
             cat > .env << 'ENVEOF'
             IMAGE_TAG=${{ github.event.pull_request.head.sha }}
             CORS_ORIGIN=${{ vars.CORS_ORIGIN }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DATABASE_URL=postgresql://glitch:${{ secrets.POSTGRES_PASSWORD }}@postgres:5432/glitch?schema=public
             ENVEOF
             docker compose pull
+            docker compose up -d --wait postgres
+            docker compose run --rm api npx prisma migrate deploy
             docker compose up -d
