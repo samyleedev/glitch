@@ -17,6 +17,7 @@ RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 
 
 RUN addgroup -S nodejs && adduser -S nestjs -G nodejs
