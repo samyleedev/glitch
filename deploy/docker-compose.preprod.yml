@@ -41,6 +41,7 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
       - "traefik.http.routers.glitch-api-preprod.rule=Host(`preprod-api.glitch.samyleedev.fr`)"
       - "traefik.http.routers.glitch-api-preprod.entrypoints=websecure"
       - "traefik.http.routers.glitch-api-preprod.tls.certresolver=letsencrypt"
